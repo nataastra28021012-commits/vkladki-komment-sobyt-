@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Комментарии, события и результаты</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+    :root { --ink:#172033; --muted:#596579; --surface:#fff; --panel:#f4f6f8; --border:#d9e1ec; --accent:#2fba7c; --accent-dark:#27a970; --focus:#ff9e1b; }
+    * { box-sizing:border-box; }
+    html, body { min-height:100%; margin:0; }
+    body { min-height:100vh; padding:0 20px; color:var(--ink); background:#fff; font:18px/1.55 Inter, Arial, sans-serif; }
+    .interactive { width:min(1080px,100%); margin:0 auto; padding:clamp(24px,5vw,48px); border:1px solid var(--border); border-radius:24px; background:var(--surface); box-shadow:0 16px 36px rgba(23,32,51,.12); }
+    .tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+    .tab, .subtab { border:2px solid var(--accent); border-radius:14px; color:#fff; background:var(--accent); cursor:pointer; font:700 20px/1.3 Inter,Arial,sans-serif; text-align:center; transition:background .2s ease, box-shadow .2s ease, transform .2s ease; }
+    .tab { display:flex; align-items:center; justify-content:center; min-height:80px; padding:18px; }
+    .tab:hover, .tab.is-active, .subtab:hover, .subtab.is-active { transform:translateY(-3px); background:var(--accent-dark); box-shadow:0 8px 20px rgba(47,186,124,.3); }
+    .tab:focus-visible, .subtab:focus-visible, .screen:focus-visible, .modal-close:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
+    .panel { min-height:330px; margin-top:28px; padding:clamp(22px,4vw,36px); border-radius:18px; background:var(--panel); }
+    .panel.results-open { min-height:254px; }
+    .placeholder { margin:0; color:var(--muted); }
+    .content[hidden], .subcontent[hidden] { display:none; }
+    .content, .subcontent { animation:appear .25s ease-out; }
+    .content h2, .subcontent h3 { margin:0 0 16px; font-size:20px; line-height:1.25; }
+    .content p, .subcontent p { margin:0; }
+    .content p + p, .subcontent p + p { margin-top:16px; }
+    a { color:#147c54; font-weight:600; text-decoration-thickness:1px; text-underline-offset:2px; }
+    .subtabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:0 0 24px; }
+    .subtab { min-height:66px; padding:12px 10px; color:var(--ink); background:#fff; }
+    .subtab:hover, .subtab.is-active { color:var(--ink); background:#fff; border-color:var(--accent-dark); box-shadow:0 8px 20px rgba(47,186,124,.2); }
+    figure { margin:24px 0 0; }
+    .content[data-content="results"] > figure { margin-bottom:24px; }
+    .screen { display:block; width:100%; height:auto; border:1px solid var(--border); border-radius:0; background:#fff; cursor:zoom-in; }
+    .image-note { margin:10px 0 0; color:var(--muted); font-size:18px; line-height:1.45; }
+    .info-trigger { display:inline-grid; width:28px; height:28px; margin:0 0 0 6px; padding:0; place-items:center; vertical-align:middle; border:0; border-radius:50%; color:#fff; background:var(--accent); box-shadow:0 2px 5px rgba(23,32,51,.2); cursor:pointer; font:700 20px/1 Inter,Arial,sans-serif; }
+    .info-trigger:hover { background:var(--accent-dark); }
+    .image-modal, .info-modal { position:fixed; z-index:1000; inset:0; display:flex; align-items:center; justify-content:center; padding:28px; background:rgba(23,32,51,.48); }
+    .image-modal[hidden], .info-modal[hidden] { display:none; }
+    .image-modal__content { position:relative; display:flex; max-width:min(1400px,100%); max-height:100%; }
+    .image-modal img { display:block; max-width:100%; max-height:calc(100vh - 56px); width:auto; height:auto; border-radius:0; background:#fff; }
+    .info-modal__content { position:relative; width:min(690px,100%); padding:36px; border-radius:14px; background:#fff; box-shadow:0 18px 44px rgba(23,32,51,.22); }
+    .info-modal__content p { margin:0; font-weight:700; }
+    .modal-close { position:absolute; top:12px; right:12px; display:grid; width:32px; height:32px; padding:0; place-items:center; border:0; border-radius:50%; color:#344054; background:#f1f4f8; cursor:pointer; font:700 24px/1 Inter,Arial,sans-serif; }
+    .modal-close:hover { background:#e5eaf0; }
+    @keyframes appear { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    @media (max-width:700px) {
+      body { padding:0 14px; font-size:18px; }
+      .tabs { gap:8px; }
+      .tab { min-height:70px; padding:12px 8px; }
+      .subtabs { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .image-modal { padding:16px; }
+      .image-modal img { max-height:calc(100vh - 32px); }
+    }
+  </style>
+</head>
+<body>
+  <main class="interactive">
+    <section class="tabs" aria-label="Разделы">
+      <button class="tab" type="button" data-tab="comments" aria-controls="content" aria-pressed="false">Комментарии</button>
+      <button class="tab" type="button" data-tab="events" aria-controls="content" aria-pressed="false">События</button>
+      <button class="tab" type="button" data-tab="results" aria-controls="content" aria-pressed="false">Результаты</button>
+    </section>
+
+    <section class="panel" id="content" aria-live="polite">
+      <article class="content" data-content="comments" hidden>
+        <h2>Вкладка «Комментарии»</h2>
+        <p>На этой вкладке тебе нужно расписать, как ты распределил дополнительные<br>производственные задачи и сколько дней запланировал на каждую из них.</p>
+        <p>Или можно прикрепить ссылку на заполненную <a href="https://point.2gis.ru/personal/o_yarceva/_layouts/15/WopiFrame2.aspx?sourcedoc=%7B76e89f0d-097c-49ed-a0a0-980f48d0e184%7D&amp;action=default&amp;slrid=0c1c30a2-2d66-b093-b04c-6e30f278c8d8" target="_blank" rel="noopener noreferrer">таблицу</a>, о которой мы уже рассказывали<br>в главе <a href="#page=f22beaad-02b2-491e-b114-6c4e04cf36">«Вкладка Параметры»</a>. Тогда расписывать это текстом уже не требуется.</p>
+        <p>Также здесь будет оставлять свои комментарии твой куратор из направления контроля. Куратор проверяет составленный тобой на месяц план и пишет, если нужно что-то исправить или доработать.</p>
+        <figure>
+          <img class="screen" src="Комментарии.png" alt="Вкладка «Комментарии»" data-image-name="Комментарии.png">
+        </figure>
+      </article>
+
+      <article class="content" data-content="events" hidden>
+        <h2>Вкладка «События»</h2>
+        <p>Показывает, какие действия по планированию были выполнены и кем.</p>
+        <figure>
+          <img class="screen" src="События.png" alt="Вкладка «События»" data-image-name="События.png">
+          
+        </figure>
+      </article>
+
+      <article class="content" data-content="results" hidden>
+        <h2>Вкладка «Результаты»</h2>
+        <p>Внутри этой вкладки есть ещё четыре вкладки: «Территории», «Задачи», «Зацепки» и «Входы».</p>
+        <figure>
+          <img class="screen" src="Результаты.png" alt="Вкладка «Результаты»" data-image-name="Результаты.png">
+          
+        </figure>
+
+        <div class="subtabs" role="group" aria-label="Разделы результатов">
+          <button class="subtab" type="button" data-subtab="territories" aria-controls="results-content" aria-pressed="false">Территории</button>
+          <button class="subtab" type="button" data-subtab="tasks" aria-controls="results-content" aria-pressed="false">Задачи</button>
+          <button class="subtab" type="button" data-subtab="leads" aria-controls="results-content" aria-pressed="false">Зацепки</button>
+          <button class="subtab" type="button" data-subtab="entrances" aria-controls="results-content" aria-pressed="false">Входы</button>
+        </div>
+        <p class="placeholder" id="results-placeholder"><em>Кликай на вкладки, чтобы узнать подробнее</em></p>
+
+        <section id="results-content" aria-live="polite">
+          <article class="subcontent" data-subcontent="territories" hidden>
+            <h3>Вкладка «Территории»</h3>
+            <p><strong>Показывает прогресс по территориям в работе:</strong> какой процент работ выполнен,<br>закрыта территория или нет.</p>
+            <p>Обычно территория закрывается, когда на ней закрыты все задачи. Но если этого не произошло, закрыть территорию можно вручную, нажав кнопку «Закрыть» в столбце «Действия». И наоборот, если по какой-то причине требуется повторно открыть территорию, нажми кнопку «Открыть».</p>
+            <p>Кнопка «Выгрузить в Excel» позволяет сделать выгрузку зданий и организаций на территории<br>в формате Excel.<button class="info-trigger" id="territories-info-trigger" type="button" aria-controls="territories-info-modal" aria-haspopup="dialog" aria-label="Показать дополнительную информацию">i</button></p>
+            <figure><img class="screen" src="Территории.png" alt="Вкладка «Территории»" data-image-name="Территории.png"></figure>
+          </article>
+          <article class="subcontent" data-subcontent="tasks" hidden>
+            <h3>Вкладка «Задачи»</h3>
+            <p>Помогает увидеть, кто и с каким результатом закрывал задачи на территории.</p>
+            <p>На основе этих данных можно провести анализ работы специалистов.<br>Подробнее о нём читай по <a href="https://wiki.2gis.ru/pages/viewpage.action?pageId=324599834#id-%D0%9F%D0%BB%D0%B0%D0%BD%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D1%8B%D0%BF%D0%BE%D0%BB%D0%B5%D0%B2%D0%BE%D0%B3%D0%BE%D1%81%D0%BF%D0%B5%D1%86%D0%B8%D0%B0%D0%BB%D0%B8%D1%81%D1%82%D0%B0-%D0%90%D0%BD%D0%B0%D0%BB%D0%B8%D0%B7%D1%80%D0%B5%D0%B7%D1%83%D0%BB%D1%8C%D1%82%D0%B0%D1%82%D0%BE%D0%B2%D0%BF%D0%BE%D0%BB%D0%B5%D0%B2%D0%BE%D0%B9%D0%B2%D1%8B%D0%B2%D0%B5%D1%80%D0%BA%D0%B8:~:text=%D0%BF%D0%BE%D0%B4%20%D1%81%D0%B2%D0%BE%D0%B8%20%D0%B7%D0%B0%D0%B4%D0%B0%D1%87%D0%B8.-,%D0%90%D0%BD%D0%B0%D0%BB%D0%B8%D0%B7%20%D1%80%D0%B5%D0%B7%D1%83%D0%BB%D1%8C%D1%82%D0%B0%D1%82%D0%BE%D0%B2%20%D0%BF%D0%BE%20%D0%BF%D0%BE%D0%BB%D0%B5%D0%B2%D0%BE%D0%B9%20%D0%B2%D1%8B%D0%B2%D0%B5%D1%80%D0%BA%D0%B8,-%D0%9F%D1%80%D0%B8%20%D0%BF%D0%B5%D1%80%D0%B5%D1%85%D0%BE%D0%B4%D0%B5%20%D0%B2%D0%BE" target="_blank" rel="noopener noreferrer">ссылке</a>.</p>
+            <figure><img class="screen" src="Задачи.png" alt="Вкладка «Задачи»" data-image-name="Задачи.png"></figure>
+          </article>
+          <article class="subcontent" data-subcontent="leads" hidden>
+            <h3>Вкладка «Зацепки»</h3>
+            <p>Показывает все зацепки, которые были созданы в результате выверки назначенных территорий.</p>
+            <figure><img class="screen" src="Зацепки.png" alt="Вкладка «Зацепки»" data-image-name="Зацепки.png"></figure>
+          </article>
+          <article class="subcontent" data-subcontent="entrances" hidden>
+            <h3>Вкладка «Входы»</h3>
+            <p>После настройки фильтров можно увидеть, у каких зданий нет входа или главного входа,<br>где была ручная привязка, а где — системная.</p>
+            <figure><img class="screen" src="Входы.png" alt="Вкладка «Входы»" data-image-name="Входы.png"></figure>
+          </article>
+        </section>
+      </article>
+    </section>
+  </main>
+
+  <div class="image-modal" id="image-modal" role="dialog" aria-modal="true" aria-label="Увеличенное изображение" hidden>
+    <div class="image-modal__content">
+      <img id="modal-image" src="" alt="">
+      <button class="modal-close" id="modal-close" type="button" aria-label="Закрыть увеличенное изображение">×</button>
+    </div>
+  </div>
+
+  <div class="info-modal" id="territories-info-modal" role="dialog" aria-modal="true" aria-label="Дополнительная информация" hidden>
+    <div class="info-modal__content">
+      <button class="modal-close" id="territories-info-close" type="button" aria-label="Закрыть дополнительную информацию">×</button>
+      <p>Кнопки «Открыть»/«Закрыть» и «Выгрузить в Excel» находятся близко друг к другу. Будь внимателен при выборе, чтобы нажать именно на ту, которая тебе нужна.</p>
+    </div>
+  </div>
+
+  <script>
+    const tabs = document.querySelectorAll('.tab');
+    const contents = document.querySelectorAll('.content');
+    const panel = document.getElementById('content');
+    const resultsPlaceholder = document.getElementById('results-placeholder');
+    const subtabs = document.querySelectorAll('.subtab');
+    const subcontents = document.querySelectorAll('.subcontent');
+    const images = document.querySelectorAll('.screen');
+    const imageModal = document.getElementById('image-modal');
+    const modalImage = document.getElementById('modal-image');
+    const modalClose = document.getElementById('modal-close');
+    const territoriesInfoTrigger = document.getElementById('territories-info-trigger');
+    const territoriesInfoModal = document.getElementById('territories-info-modal');
+    const territoriesInfoClose = document.getElementById('territories-info-close');
+    let lastFocusedImage = null;
+
+    function showTab(tabName) {
+      tabs.forEach((tab) => {
+        const isActive = tab.dataset.tab === tabName;
+        tab.classList.toggle('is-active', isActive);
+        tab.setAttribute('aria-pressed', String(isActive));
+      });
+      contents.forEach((content) => { content.hidden = content.dataset.content !== tabName; });
+      panel.classList.toggle('results-open', tabName === 'results');
+      if (tabName === 'results') {
+        subtabs.forEach((tab) => {
+          tab.classList.remove('is-active');
+          tab.setAttribute('aria-pressed', 'false');
+        });
+        subcontents.forEach((content) => { content.hidden = true; });
+        resultsPlaceholder.hidden = false;
+      }
+    }
+
+    function showSubtab(subtabName) {
+      subtabs.forEach((tab) => {
+        const isActive = tab.dataset.subtab === subtabName;
+        tab.classList.toggle('is-active', isActive);
+        tab.setAttribute('aria-pressed', String(isActive));
+      });
+      subcontents.forEach((content) => { content.hidden = content.dataset.subcontent !== subtabName; });
+      resultsPlaceholder.hidden = true;
+    }
+
+    function openImage(image) {
+      lastFocusedImage = image;
+      modalImage.src = image.currentSrc || image.src;
+      modalImage.alt = image.alt;
+      imageModal.hidden = false;
+      modalClose.focus();
+    }
+
+    function closeImage() {
+      imageModal.hidden = true;
+      modalImage.src = '';
+      if (lastFocusedImage) lastFocusedImage.focus();
+    }
+
+    tabs.forEach((tab) => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+    subtabs.forEach((tab) => tab.addEventListener('click', () => showSubtab(tab.dataset.subtab)));
+    function openTerritoriesInfo() {
+      territoriesInfoModal.hidden = false;
+      territoriesInfoClose.focus();
+    }
+
+    function closeTerritoriesInfo() {
+      territoriesInfoModal.hidden = true;
+      territoriesInfoTrigger.focus();
+    }
+
+    territoriesInfoTrigger.addEventListener('click', openTerritoriesInfo);
+    territoriesInfoClose.addEventListener('click', closeTerritoriesInfo);
+    territoriesInfoModal.addEventListener('click', (event) => {
+      if (event.target === territoriesInfoModal) closeTerritoriesInfo();
+    });
+    images.forEach((image) => {
+      image.tabIndex = 0;
+      image.setAttribute('role', 'button');
+      image.setAttribute('aria-label', `Увеличить: ${image.alt}`);
+      image.addEventListener('click', () => openImage(image));
+      image.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openImage(image);
+        }
+      });
+    });
+    modalClose.addEventListener('click', closeImage);
+    imageModal.addEventListener('click', (event) => {
+      if (event.target === imageModal) closeImage();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if (!imageModal.hidden) closeImage();
+      if (!territoriesInfoModal.hidden) closeTerritoriesInfo();
+    });
+  </script>
+</body>
+</html>
